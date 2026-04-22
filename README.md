@@ -32,13 +32,13 @@ Construí isso porque a maioria dos scrapers só captura headers parciais e perd
 **Via imagem publicada (recomendado):**
 
 ```bash
-docker run -d -p 9191:9191 ghcr.io/leonardowg/header-harvest:latest
+docker run -d -p 9191:9191 ghcr.io/DarkKon2713/header-harvest:latest
 ```
 
 Porta customizada:
 
 ```bash
-docker run -d -p 8080:8080 -e PORT=8080 ghcr.io/leonardowg/header-harvest:latest
+docker run -d -p 8080:8080 -e PORT=8080 ghcr.io/DarkKon2713/header-harvest:latest
 ```
 
 **Via código-fonte:**
@@ -274,13 +274,13 @@ I built this because most scrapers only capture partial response headers and com
 **From published image (recommended):**
 
 ```bash
-docker run -d -p 9191:9191 ghcr.io/leonardowg/header-harvest:latest
+docker run -d -p 9191:9191 ghcr.io/darkkon2713/header-harvest:latest
 ```
 
 Custom port:
 
 ```bash
-docker run -d -p 8080:8080 -e PORT=8080 ghcr.io/leonardowg/header-harvest:latest
+docker run -d -p 8080:8080 -e PORT=8080 ghcr.io/darkkon2713/header-harvest:latest
 ```
 
 **From source:**
