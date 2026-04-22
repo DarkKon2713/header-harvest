@@ -100,6 +100,7 @@ async def do_request(
     only_cookies: bool = False,
     wait_seconds: int = 0,
     js_code: Optional[str] = None,
+    capture_headers: Optional[list] = None,
 ) -> dict:
     effective_timeout = timeout or MAX_TIMEOUT
     own_context = False
@@ -144,7 +145,9 @@ async def do_request(
     def on_request(request):
         try:
             req_headers = request.headers
-            for key in ("authorization", "x-api-key", "x-auth-token", "x-access-token"):
+            fixed = ("authorization", "x-api-key", "x-auth-token", "x-access-token", "visitorid")
+            keys = set(fixed) | {k.lower() for k in (capture_headers or [])}
+            for key in keys:
                 value = req_headers.get(key)
                 if value:
                     captured_auth[key] = value
@@ -300,6 +303,7 @@ async def handle_v1(request: Request):
                 only_cookies=bool(body.get("returnOnlyCookies", False)),
                 wait_seconds=int(body.get("waitInSeconds", 0)),
                 js_code=body.get("javaScript"),
+                capture_headers=body.get("captureHeaders"),
             )
 
         if cmd == "request.post":
@@ -318,6 +322,7 @@ async def handle_v1(request: Request):
                 only_cookies=bool(body.get("returnOnlyCookies", False)),
                 wait_seconds=int(body.get("waitInSeconds", 0)),
                 js_code=body.get("javaScript"),
+                capture_headers=body.get("captureHeaders"),
             )
 
         if cmd == "sessions.create":
