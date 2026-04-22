@@ -19,7 +19,8 @@ Construí isso porque a maioria dos scrapers só captura headers parciais e perd
 ### Funcionalidades
 
 - Captura completa de headers de resposta
-- **Interceptação de tokens de auth** em sub-requests (`Authorization`, `x-api-key`, `x-auth-token`, `x-access-token`)
+- **Interceptação de tokens de auth** em sub-requests (`Authorization`, `x-api-key`, `x-auth-token`, `x-access-token`, `visitorid`)
+- **Headers customizados** — passe `captureHeaders` no request para interceptar qualquer header adicional dinamicamente
 - **Injeção de JavaScript** — executa código JS na página e retorna o resultado
 - Sessões persistentes com gerenciamento automático de cookies
 - Suporte a proxy HTTP — simples ou autenticado com usuário, zona, senha e afins
@@ -78,6 +79,20 @@ curl -X POST http://localhost:9191/v1 \
   }'
 ```
 
+**GET com headers customizados** (`captureHeaders` intercepta em requests e responses durante todo o carregamento)
+
+```bash
+curl -X POST http://localhost:9191/v1 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "cmd": "request.get",
+    "url": "https://alvo.com",
+    "session": "minha_sessao",
+    "waitInSeconds": 3,
+    "captureHeaders": ["visitortoken", "x-custom-token"]
+  }'
+```
+
 **POST**
 
 ```bash
@@ -109,10 +124,11 @@ curl -X POST http://localhost:9191/v1 -H "Content-Type: application/json" \
 | `url` | string | — | URL alvo |
 | `session` | string | — | ID da sessão |
 | `maxTimeout` | int | `60000` | Timeout em ms |
-| `waitInSeconds` | int | `0` | Aguarda N segundos após o page load — use para páginas que renderizam conteúdo via JS após o carregamento |
+| `waitInSeconds` | int | `0` | Aguarda N segundos após o page load — use para páginas que renderizam conteúdo via JS após o carregamento; `captureHeaders` continua capturando durante todo esse período |
 | `returnScreenshot` | bool | `false` | Retorna screenshot da página completa (base64 PNG) |
 | `returnOnlyCookies` | bool | `false` | Retorna apenas cookies, sem body nem headers |
 | `javaScript` | string | `null` | Função JS executada na página após o carregamento |
+| `captureHeaders` | list | `null` | Headers adicionais a interceptar em todos os sub-requests — busca tanto nos headers de saída (request) quanto nos headers de resposta (response), incluindo durante o `waitInSeconds` (ex: `["visitortoken", "x-custom-token"]`) |
 | `cookies` | list | `null` | Cookies customizados a injetar |
 | `headers` | dict | `null` | Headers extras para o request |
 | `postData` | string | `null` | Body para `request.post` |
@@ -236,6 +252,7 @@ environment:
 |---|---|---|
 | Headers completos | Parcial | Todos |
 | Interceptação de tokens de auth | Não | Sim (XHR/fetch) |
+| Headers customizados a interceptar | Não | Sim (`captureHeaders`) |
 | Injeção de JavaScript | Não | Sim |
 | `waitInSeconds` | Sim | Sim |
 | `returnOnlyCookies` | Sim | Sim |
@@ -257,7 +274,8 @@ I built this because most scrapers only capture partial response headers and com
 ### Features
 
 - Full response header capture
-- **Auth token interception** from sub-requests (`Authorization`, `x-api-key`, `x-auth-token`, `x-access-token`)
+- **Auth token interception** from sub-requests (`Authorization`, `x-api-key`, `x-auth-token`, `x-access-token`, `visitorid`)
+- **Custom header capture** — pass `captureHeaders` in the request to intercept any additional header dynamically
 - **JavaScript injection** — run JS on the page and return the result
 - Persistent sessions with automatic cookie management
 - HTTP proxy support — plain or authenticated with user, zone, password, etc.
@@ -316,6 +334,20 @@ curl -X POST http://localhost:9191/v1 \
   }'
 ```
 
+**GET with custom headers** (`captureHeaders` intercepts from requests and responses throughout the entire load)
+
+```bash
+curl -X POST http://localhost:9191/v1 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "cmd": "request.get",
+    "url": "https://target.com",
+    "session": "my_session",
+    "waitInSeconds": 3,
+    "captureHeaders": ["visitortoken", "x-custom-token"]
+  }'
+```
+
 **POST**
 
 ```bash
@@ -347,10 +379,11 @@ curl -X POST http://localhost:9191/v1 -H "Content-Type: application/json" \
 | `url` | string | — | Target URL |
 | `session` | string | — | Session ID |
 | `maxTimeout` | int | `60000` | Timeout in ms |
-| `waitInSeconds` | int | `0` | Wait N seconds after page load — use for pages that render content via JS after load |
+| `waitInSeconds` | int | `0` | Wait N seconds after page load — use for pages that render content via JS after load; `captureHeaders` keeps capturing throughout this period |
 | `returnScreenshot` | bool | `false` | Return full-page screenshot (base64 PNG) |
 | `returnOnlyCookies` | bool | `false` | Return only cookies, skip body and headers |
 | `javaScript` | string | `null` | JS function evaluated on the page after load |
+| `captureHeaders` | list | `null` | Additional headers to intercept from all sub-requests — scans both outgoing request headers and response headers, including during `waitInSeconds` (e.g. `["visitortoken", "x-custom-token"]`) |
 | `cookies` | list | `null` | Custom cookies to inject |
 | `headers` | dict | `null` | Extra request headers |
 | `postData` | string | `null` | Body for `request.post` |
@@ -474,6 +507,7 @@ environment:
 |---|---|---|
 | Full response headers | Partial | All |
 | Auth token interception | No | Yes (XHR/fetch) |
+| Custom headers to intercept | No | Yes (`captureHeaders`) |
 | JavaScript injection | No | Yes |
 | `waitInSeconds` | Yes | Yes |
 | `returnOnlyCookies` | Yes | Yes |

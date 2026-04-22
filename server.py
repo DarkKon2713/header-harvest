@@ -7,7 +7,11 @@ from contextlib import asynccontextmanager
 from typing import Optional
 from urllib.parse import urlparse
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s  %(levelname)-8s %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI, Request
@@ -100,7 +104,10 @@ async def do_request(
     only_cookies: bool = False,
     wait_seconds: int = 0,
     js_code: Optional[str] = None,
+    capture_headers: Optional[list] = None,
 ) -> dict:
+    t0 = time.monotonic()
+    logger.info("%s %s | session=%s capture=%s", method.upper(), url, session, capture_headers or [])
     effective_timeout = timeout or MAX_TIMEOUT
     own_context = False
 
@@ -134,17 +141,25 @@ async def do_request(
     async def on_response(response):
         nonlocal captured_status, captured_headers
         try:
+            resp_headers = await response.all_headers()
             if response.url == url or response.url.startswith(base_url):
                 if captured_status is None or response.url == url:
                     captured_status = response.status
-                    captured_headers = await response.all_headers()
+                    captured_headers = resp_headers
+            if capture_headers:
+                for key in (k.lower() for k in capture_headers):
+                    value = resp_headers.get(key)
+                    if value:
+                        captured_auth[key] = value
         except Exception as e:
             logger.warning("on_response error: %s", e)
 
     def on_request(request):
         try:
             req_headers = request.headers
-            for key in ("authorization", "x-api-key", "x-auth-token", "x-access-token"):
+            fixed = ("authorization", "x-api-key", "x-auth-token", "x-access-token")
+            keys = set(fixed) | {k.lower() for k in (capture_headers or [])}
+            for key in keys:
                 value = req_headers.get(key)
                 if value:
                     captured_auth[key] = value
@@ -209,6 +224,11 @@ async def do_request(
             screenshot_b64 = base64.b64encode(png).decode()
 
         merged_headers = {**captured_headers, **captured_auth}
+        elapsed = time.monotonic() - t0
+        logger.info(
+            "%s %s | status=%s tokens=%s screenshot=%s %.1fs",
+            method.upper(), url, captured_status, list(captured_auth.keys()), screenshot, elapsed,
+        )
 
         return {
             "status": "ok",
@@ -236,7 +256,7 @@ async def do_request(
 async def lifespan(app: FastAPI):
     await get_browser()
     proxy_info = f"PROXY={PROXY_URL}" if PROXY_URL else "PROXY=none"
-    print(f"Browser ready | {proxy_info}")
+    logger.info("Browser ready | port=%d headless=%s %s", PORT, HEADLESS, proxy_info)
     yield
     for ctx in sessions.values():
         try:
@@ -300,6 +320,7 @@ async def handle_v1(request: Request):
                 only_cookies=bool(body.get("returnOnlyCookies", False)),
                 wait_seconds=int(body.get("waitInSeconds", 0)),
                 js_code=body.get("javaScript"),
+                capture_headers=body.get("captureHeaders"),
             )
 
         if cmd == "request.post":
@@ -318,6 +339,7 @@ async def handle_v1(request: Request):
                 only_cookies=bool(body.get("returnOnlyCookies", False)),
                 wait_seconds=int(body.get("waitInSeconds", 0)),
                 js_code=body.get("javaScript"),
+                capture_headers=body.get("captureHeaders"),
             )
 
         if cmd == "sessions.create":
@@ -347,8 +369,7 @@ async def handle_v1(request: Request):
 
 
 if __name__ == "__main__":
-    print(f"✅ HeaderHarvest running on http://0.0.0.0:{PORT}")
-    print(f"   HEADLESS={HEADLESS}  MAX_TIMEOUT={MAX_TIMEOUT}ms")
+    logger.info("HeaderHarvest starting | port=%d headless=%s timeout=%dms", PORT, HEADLESS, MAX_TIMEOUT)
     if PROXY_URL:
-        print(f"   PROXY={PROXY_URL}")
+        logger.info("Global proxy: %s", PROXY_URL)
     uvicorn.run(app, host="0.0.0.0", port=PORT)

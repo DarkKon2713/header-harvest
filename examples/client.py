@@ -64,6 +64,7 @@ class HeaderHarvest:
         only_cookies: bool = False,
         wait_seconds: int = 0,
         js_code: Optional[str] = None,
+        capture_headers: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         data: Dict[str, Any] = {
             "cmd": "request.get",
@@ -78,6 +79,8 @@ class HeaderHarvest:
             data["javaScript"] = js_code
         if cookies:
             data["cookies"] = cookies
+        if capture_headers:
+            data["captureHeaders"] = capture_headers
 
         logger.debug("GET %s (session=%s)", url, session_id)
         return self._post(data)
@@ -93,6 +96,7 @@ class HeaderHarvest:
         only_cookies: bool = False,
         wait_seconds: int = 0,
         js_code: Optional[str] = None,
+        capture_headers: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         data: Dict[str, Any] = {
             "cmd": "request.post",
@@ -108,6 +112,8 @@ class HeaderHarvest:
             data["javaScript"] = js_code
         if headers:
             data["headers"] = headers
+        if capture_headers:
+            data["captureHeaders"] = capture_headers
 
         logger.debug("POST %s (session=%s)", url, session_id)
         return self._post(data)
