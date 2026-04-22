@@ -29,6 +29,14 @@ Construí isso porque a maioria dos scrapers só captura headers parciais e perd
 
 ### Início rápido
 
+**Via imagem publicada (recomendado)**
+
+```bash
+docker run -d -p 9191:9191 ghcr.io/darkkon2713/header-harvest:latest
+```
+
+**Via Docker Compose (build local)**
+
 ```bash
 docker compose up --build -d
 ```
@@ -212,11 +220,13 @@ environment:
 ```
 ├── server.py              # Servidor FastAPI + Playwright
 ├── requirements.txt
-├── dockerfile
+├── Dockerfile
 ├── compose.yml
+├── .dockerignore
 ├── examples/
 │   ├── client.py          # Classe HeaderHarvest
-│   └── test.py            # Exemplo de uso
+│   ├── test.py            # Exemplo de uso
+│   └── requirements.txt   # requests
 └── LICENSE
 ```
 
@@ -256,6 +266,14 @@ I built this because most scrapers only capture partial response headers and com
 - Docker ready
 
 ### Quickstart
+
+**Using the published image (recommended)**
+
+```bash
+docker run -d -p 9191:9191 ghcr.io/darkkon2713/header-harvest:latest
+```
+
+**Via Docker Compose (local build)**
 
 ```bash
 docker compose up --build -d
@@ -440,11 +458,13 @@ environment:
 ```
 ├── server.py              # FastAPI + Playwright server
 ├── requirements.txt
-├── dockerfile
+├── Dockerfile
 ├── compose.yml
+├── .dockerignore
 ├── examples/
 │   ├── client.py          # HeaderHarvest class
-│   └── test.py            # Usage example
+│   ├── test.py            # Usage example
+│   └── requirements.txt   # requests
 └── LICENSE
 ```
 
