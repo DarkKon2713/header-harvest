@@ -63,6 +63,15 @@ def parse_proxy(proxy_url: str) -> Optional[dict]:
     return {"server": proxy_url.rstrip("/")}
 
 
+def _mask_proxy(proxy_url: str) -> str:
+    if not proxy_url:
+        return "none"
+    parsed = urlparse(proxy_url)
+    if parsed.password:
+        return f"{parsed.scheme}://***@{parsed.hostname}:{parsed.port}"
+    return proxy_url.rstrip("/")
+
+
 async def get_browser() -> Browser:
     global _browser, _playwright
     if _browser is None or not _browser.is_connected():
@@ -89,6 +98,7 @@ async def get_or_create_session(
         kwargs["proxy"] = proxy
     context = await browser.new_context(**kwargs)
     sessions[session_id] = context
+    logger.info("session.create | session=%s proxy=%s", session_id, _mask_proxy(proxy_url or PROXY_URL))
     return context
 
 
@@ -258,11 +268,14 @@ async def lifespan(app: FastAPI):
     proxy_info = f"PROXY={PROXY_URL}" if PROXY_URL else "PROXY=none"
     logger.info("Browser ready | port=%d headless=%s %s", PORT, HEADLESS, proxy_info)
     yield
-    for ctx in sessions.values():
+    if sessions:
+        logger.info("Shutdown: closing %d active session(s)", len(sessions))
+    for sid, ctx in list(sessions.items()):
         try:
             await ctx.close()
-        except Exception:
-            pass
+            logger.info("session.destroy | session=%s reason=shutdown", sid)
+        except Exception as e:
+            logger.warning("session.destroy failed | session=%s error=%s", sid, e)
     if _browser:
         try:
             await _browser.close()
@@ -358,6 +371,7 @@ async def handle_v1(request: Request):
             if session_id in sessions:
                 ctx = sessions.pop(session_id)
                 await ctx.close()
+                logger.info("session.destroy | session=%s", session_id)
                 return {"status": "ok"}
             return JSONResponse(status_code=404, content={"status": "error", "message": "Session not found"})
 
