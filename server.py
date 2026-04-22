@@ -41,14 +41,19 @@ LAUNCH_ARGS = [
 ]
 
 
-def parse_proxy(proxy_url: str) -> Optional[dict]:
+def parse_proxy(proxy_url) -> Optional[dict]:
     """Convert proxy URL to Playwright proxy dict.
 
     Supports: http://host:port  and  http://user:pass@host:port
     (including Bright Data: http://brd-customer-...:pass@zproxy.lum-superproxy.io:22225)
+    Also accepts a dict already in Playwright format (passthrough).
     """
     if not proxy_url:
         return None
+    if isinstance(proxy_url, dict):
+        return proxy_url if proxy_url.get("server") else None
+    if not isinstance(proxy_url, str):
+        raise ValueError(f"proxy must be a string URL or dict, got {type(proxy_url).__name__}")
     parsed = urlparse(proxy_url)
     if parsed.username or parsed.password:
         # Proxy autenticado: separa credenciais da URL do servidor
@@ -63,9 +68,12 @@ def parse_proxy(proxy_url: str) -> Optional[dict]:
     return {"server": proxy_url.rstrip("/")}
 
 
-def _mask_proxy(proxy_url: str) -> str:
+def _mask_proxy(proxy_url) -> str:
     if not proxy_url:
         return "none"
+    if isinstance(proxy_url, dict):
+        server = proxy_url.get("server", "")
+        return f"***@{server}" if proxy_url.get("username") else server
     parsed = urlparse(proxy_url)
     if parsed.password:
         return f"{parsed.scheme}://***@{parsed.hostname}:{parsed.port}"
