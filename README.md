@@ -29,6 +29,20 @@ Construí isso porque a maioria dos scrapers só captura headers parciais e perd
 
 ### Início rápido
 
+**Via imagem publicada (recomendado):**
+
+```bash
+docker run -d -p 9191:9191 ghcr.io/leonardowg/header-harvest:latest
+```
+
+Porta customizada:
+
+```bash
+docker run -d -p 8080:8080 -e PORT=8080 ghcr.io/leonardowg/header-harvest:latest
+```
+
+**Via código-fonte:**
+
 ```bash
 docker compose up --build -d
 ```
@@ -224,11 +238,11 @@ environment:
 
 | Funcionalidade | FlareSolverr | HeaderHarvest |
 |---|---|---|
-| Headers completos | Parcial | Todos |
+| Headers completos | Não | Todos |
 | Interceptação de tokens de auth | Não | Sim (XHR/fetch) |
 | Injeção de JavaScript | Não | Sim |
-| `waitInSeconds` | Sim | Sim |
-| `returnOnlyCookies` | Sim | Sim |
+| waitInSeconds | Sim | Sim |
+| returnOnlyCookies | Sim | Sim |
 | Screenshots (página completa) | Não | Sim |
 | Sessões | Sim | Sim |
 | POST requests | Sim | Sim |
@@ -256,6 +270,20 @@ I built this because most scrapers only capture partial response headers and com
 - Docker ready
 
 ### Quickstart
+
+**From published image (recommended):**
+
+```bash
+docker run -d -p 9191:9191 ghcr.io/leonardowg/header-harvest:latest
+```
+
+Custom port:
+
+```bash
+docker run -d -p 8080:8080 -e PORT=8080 ghcr.io/leonardowg/header-harvest:latest
+```
+
+**From source:**
 
 ```bash
 docker compose up --build -d

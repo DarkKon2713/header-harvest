@@ -10,6 +10,3 @@ services:
       - HEADLESS=false
       - MAX_TIMEOUT=60000
       - PROXY_URL=
-    shm_size: "2gb"
-    security_opt:
-      - seccomp:unconfined
