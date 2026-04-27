@@ -100,6 +100,7 @@ async def get_or_create_session(
     kwargs: dict = {
         "user_agent": USER_AGENT,
         "extra_http_headers": {"Accept-Language": "en-US,en;q=0.9"},
+        "ignore_https_errors": True,
     }
     # Proxy priority: argument > global env var
     proxy = parse_proxy(proxy_url or PROXY_URL)
@@ -137,6 +138,7 @@ async def do_request(
         kwargs: dict = {
             "user_agent": USER_AGENT,
             "extra_http_headers": {"Accept-Language": "en-US,en;q=0.9"},
+            "ignore_https_errors": True,
         }
         proxy = parse_proxy(PROXY_URL)
         if proxy:
