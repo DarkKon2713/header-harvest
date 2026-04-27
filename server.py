@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from playwright.async_api import async_playwright, Browser, BrowserContext, Playwright
+from playwright_stealth import stealth_async
 import uvicorn
 
 PORT = int(os.environ.get("PORT", 9191))
@@ -147,9 +148,7 @@ async def do_request(
         await context.add_cookies(cookies)
 
     page = await context.new_page()
-    await page.add_init_script(
-        "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
-    )
+    await stealth_async(page)
 
     captured_status: Optional[int] = None
     captured_headers: dict = {}
