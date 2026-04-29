@@ -9,6 +9,7 @@ services:
       - PORT=9191
       - HEADLESS=false
       - MAX_TIMEOUT=60000
+      - MAX_CONCURRENT=100
       - PROXY_URL=
     shm_size: "2gb"
     security_opt:
