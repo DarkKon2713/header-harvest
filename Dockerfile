@@ -10,10 +10,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN playwright install chromium
 
 COPY server.py ./
+COPY app/ ./app/
 
 ENV PORT=9191
 ENV HEADLESS=false
 ENV MAX_TIMEOUT=60000
+ENV MAX_CONCURRENT=100
 ENV PROXY_URL=
 ENV DISPLAY=:99
 

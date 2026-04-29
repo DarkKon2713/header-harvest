@@ -19,13 +19,18 @@ Construí isso porque a maioria dos scrapers só captura headers parciais e perd
 ### Funcionalidades
 
 - Captura completa de headers de resposta
-- **Interceptação de tokens de auth** em sub-requests (`Authorization`, `x-api-key`, `x-auth-token`, `x-access-token`, `visitorid`)
-- **Headers customizados** — passe `captureHeaders` no request para interceptar qualquer header adicional dinamicamente
+- **Interceptação de tokens de auth** em sub-requests (`Authorization`, `x-api-key`, `x-auth-token`, `x-access-token`)
+- **Headers customizados** — passe `captureHeaders` para interceptar qualquer header adicional dinamicamente
 - **Injeção de JavaScript** — executa código JS na página e retorna o resultado
+- **`waitUntil` configurável** — controla quando a navegação é considerada concluída (`load`, `domcontentloaded`, `networkidle`, `commit`)
+- **Bloqueio de recursos** — bloqueie imagens, fontes e CSS para cargas mais rápidas quando só precisar de headers
+- **Proxy por request** — configure proxy individualmente, sem precisar de sessão
 - Sessões persistentes com gerenciamento automático de cookies
 - Suporte a proxy HTTP — simples ou autenticado com usuário, zona, senha e afins
 - Screenshots de página completa (PNG em base64)
 - Endpoint `/v1` compatível com FlareSolverr
+- Endpoint `/health` com diagnóstico técnico (PID, uptime, browser, concorrência, sessões)
+- Limite de concorrência configurável (`MAX_CONCURRENT`)
 - Pronto para Docker
 
 ### Início rápido
@@ -50,6 +55,47 @@ Servidor rodando em `http://localhost:9191`.
 
 ```bash
 curl http://localhost:9191/
+```
+
+#### `GET /health` — Diagnóstico técnico
+
+```bash
+curl http://localhost:9191/health
+```
+
+```json
+{
+  "status": "ok",
+  "pid": 12345,
+  "uptime": "2h 14m 37s",
+  "browser": { "state": "connected", "version": "124.0.6367.82" },
+  "proxy": null,
+  "concurrency": { "max": 100, "active": 3, "free": 97 },
+  "sessions": {
+    "count": 1,
+    "items": [
+      {
+        "id": "minha_sessao",
+        "pages": 1,
+        "proxy": "none",
+        "createdAt": 1714400000000,
+        "lastUsedAt": 1714401234000,
+        "lastUrl": "https://alvo.com",
+        "requestCount": 7
+      }
+    ]
+  }
+}
+```
+
+Útil como healthcheck no Docker Compose:
+
+```yaml
+healthcheck:
+  test: ["CMD", "curl", "-f", "http://localhost:9191/health"]
+  interval: 30s
+  timeout: 5s
+  retries: 3
 ```
 
 #### `POST /v1` — Comandos
@@ -93,6 +139,31 @@ curl -X POST http://localhost:9191/v1 \
   }'
 ```
 
+**GET aguardando SPA renderizar** (`networkidle` espera a rede estabilizar)
+
+```bash
+curl -X POST http://localhost:9191/v1 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "cmd": "request.get",
+    "url": "https://alvo.com",
+    "session": "minha_sessao",
+    "waitUntil": "networkidle"
+  }'
+```
+
+**GET com bloqueio de recursos** (mais rápido quando só precisa de headers)
+
+```bash
+curl -X POST http://localhost:9191/v1 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "cmd": "request.get",
+    "url": "https://alvo.com",
+    "blockResources": ["image", "stylesheet", "font"]
+  }'
+```
+
 **POST**
 
 ```bash
@@ -106,11 +177,14 @@ curl -X POST http://localhost:9191/v1 \
   }'
 ```
 
-**Listar / destruir sessões**
+**Listar / destruir / exportar cookies de sessões**
 
 ```bash
 curl -X POST http://localhost:9191/v1 -H "Content-Type: application/json" \
   -d '{"cmd": "sessions.list"}'
+
+curl -X POST http://localhost:9191/v1 -H "Content-Type: application/json" \
+  -d '{"cmd": "sessions.get_cookies", "session": "minha_sessao"}'
 
 curl -X POST http://localhost:9191/v1 -H "Content-Type: application/json" \
   -d '{"cmd": "sessions.destroy", "session": "minha_sessao"}'
@@ -124,11 +198,14 @@ curl -X POST http://localhost:9191/v1 -H "Content-Type: application/json" \
 | `url` | string | — | URL alvo |
 | `session` | string | — | ID da sessão |
 | `maxTimeout` | int | `60000` | Timeout em ms |
-| `waitInSeconds` | int | `0` | Aguarda N segundos após o page load — use para páginas que renderizam conteúdo via JS após o carregamento; `captureHeaders` continua capturando durante todo esse período |
+| `waitInSeconds` | int | `0` | Aguarda N segundos após o page load — use para páginas que renderizam conteúdo via JS; `captureHeaders` continua capturando durante esse período |
+| `waitUntil` | string | `"load"` | Quando considerar a navegação concluída: `"load"`, `"domcontentloaded"`, `"networkidle"`, `"commit"` |
+| `blockResources` | list | `null` | Tipos de recurso a bloquear para cargas mais rápidas (ex: `["image", "stylesheet", "font", "media"]`) |
+| `proxy` | string | — | Proxy para este request (efêmero, sem sessão — sobrescreve `PROXY_URL`) |
 | `returnScreenshot` | bool | `false` | Retorna screenshot da página completa (base64 PNG) |
 | `returnOnlyCookies` | bool | `false` | Retorna apenas cookies, sem body nem headers |
 | `javaScript` | string | `null` | Função JS executada na página após o carregamento |
-| `captureHeaders` | list | `null` | Headers adicionais a interceptar em todos os sub-requests — busca tanto nos headers de saída (request) quanto nos headers de resposta (response), incluindo durante o `waitInSeconds` (ex: `["visitortoken", "x-custom-token"]`) |
+| `captureHeaders` | list | `null` | Headers adicionais a interceptar em todos os sub-requests — busca tanto nos headers de saída quanto nos de resposta (ex: `["visitortoken", "x-custom-token"]`) |
 | `cookies` | list | `null` | Cookies customizados a injetar |
 | `headers` | dict | `null` | Headers extras para o request |
 | `postData` | string | `null` | Body para `request.post` |
@@ -138,6 +215,7 @@ curl -X POST http://localhost:9191/v1 -H "Content-Type: application/json" \
 ```json
 {
   "status": "ok",
+  "startTimestamp": 1714400000000,
   "solution": {
     "url": "https://alvo.com",
     "status": 200,
@@ -201,6 +279,8 @@ finally:
 
 O proxy é configurado **uma vez na criação da sessão** e aplicado automaticamente em todos os requests.
 
+Para requests sem sessão, passe `proxy` diretamente no body.
+
 Suporta qualquer proxy no formato URL padrão, incluindo serviços que usam usuário, zona e senha:
 
 ```python
@@ -229,12 +309,22 @@ environment:
 | `PORT` | `9191` | Porta da API |
 | `HEADLESS` | `false` | `true` para rodar sem janela (necessário em servidor sem display) |
 | `MAX_TIMEOUT` | `60000` | Timeout padrão em ms |
-| `PROXY_URL` | _(vazio)_ | Proxy global — sobrescrito por sessão |
+| `MAX_CONCURRENT` | `100` | Número máximo de páginas abertas em paralelo |
+| `PROXY_URL` | _(vazio)_ | Proxy global — sobrescrito por sessão ou por request |
 
 ### Estrutura do projeto
 
 ```
-├── server.py              # Servidor FastAPI + Playwright
+├── app/
+│   ├── config.py          # Variáveis de ambiente e constantes
+│   ├── state.py           # Estado global (browser, sessions, semaphore)
+│   ├── utils.py           # parse_proxy, mask_proxy, format_uptime
+│   ├── browser.py         # get_browser, get_or_create_session, do_request
+│   ├── main.py            # FastAPI app, lifespan, exception handler
+│   └── routes/
+│       ├── health.py      # GET / e GET /health
+│       └── v1.py          # POST /v1 (todos os comandos)
+├── server.py              # Entry point (uvicorn.run)
 ├── requirements.txt
 ├── Dockerfile
 ├── compose.yml
@@ -246,6 +336,8 @@ environment:
 └── LICENSE
 ```
 
+Para adicionar novos comandos: crie ou edite um arquivo em `app/routes/` e registre o router em `app/main.py`.
+
 ### HeaderHarvest vs FlareSolverr
 
 | Funcionalidade | FlareSolverr | HeaderHarvest |
@@ -253,6 +345,11 @@ environment:
 | Headers completos | Parcial | Todos |
 | Interceptação de tokens de auth | Não | Sim (XHR/fetch) |
 | Headers customizados a interceptar | Não | Sim (`captureHeaders`) |
+| `waitUntil` configurável | Não | Sim (`load`, `networkidle`, etc.) |
+| Bloqueio de recursos | Não | Sim (`blockResources`) |
+| Proxy por request (sem sessão) | Não | Sim |
+| Exportar cookies de sessão | Não | Sim (`sessions.get_cookies`) |
+| Health check técnico | Não | Sim (`GET /health`) |
 | Injeção de JavaScript | Não | Sim |
 | `waitInSeconds` | Sim | Sim |
 | `returnOnlyCookies` | Sim | Sim |
@@ -274,13 +371,18 @@ I built this because most scrapers only capture partial response headers and com
 ### Features
 
 - Full response header capture
-- **Auth token interception** from sub-requests (`Authorization`, `x-api-key`, `x-auth-token`, `x-access-token`, `visitorid`)
+- **Auth token interception** from sub-requests (`Authorization`, `x-api-key`, `x-auth-token`, `x-access-token`)
 - **Custom header capture** — pass `captureHeaders` in the request to intercept any additional header dynamically
 - **JavaScript injection** — run JS on the page and return the result
+- **Configurable `waitUntil`** — control when navigation is considered complete (`load`, `domcontentloaded`, `networkidle`, `commit`)
+- **Resource blocking** — block images, fonts and CSS for faster loads when you only need headers
+- **Per-request proxy** — set a proxy per request without needing a session
 - Persistent sessions with automatic cookie management
 - HTTP proxy support — plain or authenticated with user, zone, password, etc.
 - Full-page screenshots (base64 PNG)
 - FlareSolverr-compatible `/v1` endpoint — drop-in replacement
+- `/health` endpoint with technical diagnostics (PID, uptime, browser, concurrency, sessions)
+- Configurable concurrency limit (`MAX_CONCURRENT`)
 - Docker ready
 
 ### Quickstart
@@ -305,6 +407,47 @@ Server runs on `http://localhost:9191`.
 
 ```bash
 curl http://localhost:9191/
+```
+
+#### `GET /health` — Technical diagnostics
+
+```bash
+curl http://localhost:9191/health
+```
+
+```json
+{
+  "status": "ok",
+  "pid": 12345,
+  "uptime": "2h 14m 37s",
+  "browser": { "state": "connected", "version": "124.0.6367.82" },
+  "proxy": null,
+  "concurrency": { "max": 100, "active": 3, "free": 97 },
+  "sessions": {
+    "count": 1,
+    "items": [
+      {
+        "id": "my_session",
+        "pages": 1,
+        "proxy": "none",
+        "createdAt": 1714400000000,
+        "lastUsedAt": 1714401234000,
+        "lastUrl": "https://target.com",
+        "requestCount": 7
+      }
+    ]
+  }
+}
+```
+
+Useful as a Docker Compose healthcheck:
+
+```yaml
+healthcheck:
+  test: ["CMD", "curl", "-f", "http://localhost:9191/health"]
+  interval: 30s
+  timeout: 5s
+  retries: 3
 ```
 
 #### `POST /v1` — Commands
@@ -348,6 +491,31 @@ curl -X POST http://localhost:9191/v1 \
   }'
 ```
 
+**GET waiting for SPA to render** (`networkidle` waits for network to settle)
+
+```bash
+curl -X POST http://localhost:9191/v1 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "cmd": "request.get",
+    "url": "https://target.com",
+    "session": "my_session",
+    "waitUntil": "networkidle"
+  }'
+```
+
+**GET with resource blocking** (faster when you only need headers)
+
+```bash
+curl -X POST http://localhost:9191/v1 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "cmd": "request.get",
+    "url": "https://target.com",
+    "blockResources": ["image", "stylesheet", "font"]
+  }'
+```
+
 **POST**
 
 ```bash
@@ -361,11 +529,14 @@ curl -X POST http://localhost:9191/v1 \
   }'
 ```
 
-**List / destroy sessions**
+**List / destroy / export cookies from sessions**
 
 ```bash
 curl -X POST http://localhost:9191/v1 -H "Content-Type: application/json" \
   -d '{"cmd": "sessions.list"}'
+
+curl -X POST http://localhost:9191/v1 -H "Content-Type: application/json" \
+  -d '{"cmd": "sessions.get_cookies", "session": "my_session"}'
 
 curl -X POST http://localhost:9191/v1 -H "Content-Type: application/json" \
   -d '{"cmd": "sessions.destroy", "session": "my_session"}'
@@ -380,10 +551,13 @@ curl -X POST http://localhost:9191/v1 -H "Content-Type: application/json" \
 | `session` | string | — | Session ID |
 | `maxTimeout` | int | `60000` | Timeout in ms |
 | `waitInSeconds` | int | `0` | Wait N seconds after page load — use for pages that render content via JS after load; `captureHeaders` keeps capturing throughout this period |
+| `waitUntil` | string | `"load"` | When to consider navigation complete: `"load"`, `"domcontentloaded"`, `"networkidle"`, `"commit"` |
+| `blockResources` | list | `null` | Resource types to block for faster loads (e.g. `["image", "stylesheet", "font", "media"]`) |
+| `proxy` | string | — | Proxy for this request (ephemeral, no session — overrides `PROXY_URL`) |
 | `returnScreenshot` | bool | `false` | Return full-page screenshot (base64 PNG) |
 | `returnOnlyCookies` | bool | `false` | Return only cookies, skip body and headers |
 | `javaScript` | string | `null` | JS function evaluated on the page after load |
-| `captureHeaders` | list | `null` | Additional headers to intercept from all sub-requests — scans both outgoing request headers and response headers, including during `waitInSeconds` (e.g. `["visitortoken", "x-custom-token"]`) |
+| `captureHeaders` | list | `null` | Additional headers to intercept from all sub-requests — scans both outgoing request headers and response headers (e.g. `["visitortoken", "x-custom-token"]`) |
 | `cookies` | list | `null` | Custom cookies to inject |
 | `headers` | dict | `null` | Extra request headers |
 | `postData` | string | `null` | Body for `request.post` |
@@ -393,6 +567,7 @@ curl -X POST http://localhost:9191/v1 -H "Content-Type: application/json" \
 ```json
 {
   "status": "ok",
+  "startTimestamp": 1714400000000,
   "solution": {
     "url": "https://target.com",
     "status": 200,
@@ -456,6 +631,8 @@ finally:
 
 Proxy is configured **once at session creation** and automatically applied to all requests.
 
+For sessionless requests, pass `proxy` directly in the request body.
+
 Supports any proxy in standard URL format, including services that use username, zone and password:
 
 ```python
@@ -484,12 +661,22 @@ environment:
 | `PORT` | `9191` | API port |
 | `HEADLESS` | `false` | Set `true` to run without a window (required on headless servers) |
 | `MAX_TIMEOUT` | `60000` | Default request timeout in ms |
-| `PROXY_URL` | _(empty)_ | Global proxy — overridden per session |
+| `MAX_CONCURRENT` | `100` | Maximum number of browser pages open in parallel |
+| `PROXY_URL` | _(empty)_ | Global proxy — overridden per session or per request |
 
 ### Project Structure
 
 ```
-├── server.py              # FastAPI + Playwright server
+├── app/
+│   ├── config.py          # Environment variables and constants
+│   ├── state.py           # Global state (browser, sessions, semaphore)
+│   ├── utils.py           # parse_proxy, mask_proxy, format_uptime
+│   ├── browser.py         # get_browser, get_or_create_session, do_request
+│   ├── main.py            # FastAPI app, lifespan, exception handler
+│   └── routes/
+│       ├── health.py      # GET / and GET /health
+│       └── v1.py          # POST /v1 (all commands)
+├── server.py              # Entry point (uvicorn.run)
 ├── requirements.txt
 ├── Dockerfile
 ├── compose.yml
@@ -501,6 +688,8 @@ environment:
 └── LICENSE
 ```
 
+To add new commands: create or edit a file in `app/routes/` and register the router in `app/main.py`.
+
 ### HeaderHarvest vs FlareSolverr
 
 | Feature | FlareSolverr | HeaderHarvest |
@@ -508,6 +697,11 @@ environment:
 | Full response headers | Partial | All |
 | Auth token interception | No | Yes (XHR/fetch) |
 | Custom headers to intercept | No | Yes (`captureHeaders`) |
+| Configurable `waitUntil` | No | Yes (`load`, `networkidle`, etc.) |
+| Resource blocking | No | Yes (`blockResources`) |
+| Per-request proxy (no session) | No | Yes |
+| Export session cookies | No | Yes (`sessions.get_cookies`) |
+| Technical health check | No | Yes (`GET /health`) |
 | JavaScript injection | No | Yes |
 | `waitInSeconds` | Yes | Yes |
 | `returnOnlyCookies` | Yes | Yes |
